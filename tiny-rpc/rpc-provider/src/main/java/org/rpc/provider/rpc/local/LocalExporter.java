@@ -52,8 +52,9 @@ public class LocalExporter implements Exporter {
                                     Method method = service.getClass().getMethod(methodName, parameterTypes);
                                     Object result = method.invoke(service, arguments);
                                     output.writeObject(result);
-                                } catch (Throwable t) {
-                                    output.writeObject(t);
+                                } catch (Exception e) {
+                                    output.writeObject(e);
+                                    e.printStackTrace();
                                 } finally {
                                     output.close();
                                 }
