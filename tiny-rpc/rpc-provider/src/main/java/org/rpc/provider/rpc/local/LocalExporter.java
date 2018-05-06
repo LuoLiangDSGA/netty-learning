@@ -34,36 +34,34 @@ public class LocalExporter implements Exporter {
         if (port <= MINPORT || port > MAXPORT) {
             throw new IllegalArgumentException("Invalid port " + port);
         }
-        log.info("Export Service：{} on {}:{}", service.getClass().getName(), InetAddress.getLocalHost().getHostAddress(), port);
+        log.info("Start Export Service：{} on {}:{}", service.getClass().getName(), InetAddress.getLocalHost().getHostAddress(), port);
         ServerSocket serverSocket = new ServerSocket(port);
         for (; ; ) {
             try {
                 final Socket socket = serverSocket.accept();
                 new Thread(() -> {
                     try {
+                        ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
                         try {
-                            ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
+                            String methodName = inputStream.readUTF();
+                            Class<?>[] parameterTypes = (Class<?>[]) inputStream.readObject();
+                            Object[] arguments = (Object[]) inputStream.readObject();
+                            ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
                             try {
-                                String methodName = inputStream.readUTF();
-                                Class<?>[] parameterTypes = (Class<?>[]) inputStream.readObject();
-                                Object[] arguments = (Object[]) inputStream.readObject();
-                                ObjectOutputStream output = new ObjectOutputStream(socket.getOutputStream());
-                                try {
-                                    Method method = service.getClass().getMethod(methodName, parameterTypes);
-                                    Object result = method.invoke(service, arguments);
-                                    output.writeObject(result);
-                                } catch (Exception e) {
-                                    output.writeObject(e);
-                                    e.printStackTrace();
-                                } finally {
-                                    output.close();
-                                }
+                                Method method = service.getClass().getMethod(methodName, parameterTypes);
+                                Object result = method.invoke(service, arguments);
+                                output.writeObject(result);
+                            } catch (Exception e) {
+                                output.writeObject(e);
+                                e.printStackTrace();
                             } finally {
-                                inputStream.close();
+                                output.close();
                             }
                         } finally {
+                            inputStream.close();
                             socket.close();
                         }
+
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
