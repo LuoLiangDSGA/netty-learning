@@ -34,14 +34,14 @@ public class LocalExporter implements Exporter {
         if (port <= MINPORT || port > MAXPORT) {
             throw new IllegalArgumentException("Invalid port " + port);
         }
-        log.info("Start Export Service：{} on {}:{}", service.getClass().getName(), InetAddress.getLocalHost().getHostAddress(), port);
+
+        log.info("Export Service：{} on port {}", service.getClass().getName(), port);
         ServerSocket serverSocket = new ServerSocket(port);
         for (; ; ) {
             try {
                 final Socket socket = serverSocket.accept();
                 new Thread(() -> {
-                    try {
-                        ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream());
+                    try (ObjectInputStream inputStream = new ObjectInputStream(socket.getInputStream())) {
                         try {
                             String methodName = inputStream.readUTF();
                             Class<?>[] parameterTypes = (Class<?>[]) inputStream.readObject();
@@ -51,23 +51,20 @@ public class LocalExporter implements Exporter {
                                 Method method = service.getClass().getMethod(methodName, parameterTypes);
                                 Object result = method.invoke(service, arguments);
                                 output.writeObject(result);
-                            } catch (Exception e) {
-                                output.writeObject(e);
-                                e.printStackTrace();
+                            } catch (Throwable t) {
+                                output.writeObject(t);
                             } finally {
                                 output.close();
                             }
                         } finally {
-                            inputStream.close();
                             socket.close();
                         }
-
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        log.error(e.getMessage(), e);
                     }
                 }).start();
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error(e.getMessage(), e);
             }
         }
     }
